@@ -50,7 +50,6 @@ class ThreatIntelTab(QWidget):
         self.btn_monitor = QPushButton("🌍  Start Threat Monitoring")
         self.btn_monitor.setCheckable(True)
         self.btn_monitor.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.set_monitoring(False)
         self.btn_monitor.clicked.connect(self._on_monitor_clicked)
         bar.addWidget(self.btn_monitor)
 
@@ -160,6 +159,9 @@ class ThreatIntelTab(QWidget):
         splitter.addWidget(det_frame)
         splitter.setSizes([750, 400])
         root.addWidget(splitter, 1)
+
+        # Set default initial state safely after all UI widgets are initialized
+        self.set_monitoring(False)
 
     def set_monitoring(self, active: bool):
         self._is_monitoring = active
