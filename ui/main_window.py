@@ -455,8 +455,10 @@ class MainWindow(QMainWindow):
                         color: {ACCENT_CYAN};
                         border: none;
                         border-left: 3px solid {ACCENT_CYAN};
+                        border-radius: 6px;
                         text-align: left;
-                        padding-left: 12px;
+                        padding-left: 14px;
+                        margin: 2px 10px;
                         font-weight: bold;
                     }}
                     """
@@ -470,11 +472,13 @@ class MainWindow(QMainWindow):
                         color: {TEXT_SECONDARY};
                         border: none;
                         border-left: 3px solid transparent;
+                        border-radius: 6px;
                         text-align: left;
-                        padding-left: 12px;
+                        padding-left: 14px;
+                        margin: 2px 10px;
                     }}
                     QPushButton:hover {{
-                        background-color: rgba(255,255,255,0.04);
+                        background-color: rgba(255, 255, 255, 0.04);
                         color: {TEXT_PRIMARY};
                     }}
                     """
