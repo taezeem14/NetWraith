@@ -357,11 +357,7 @@ class MainWindow(QMainWindow):
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
 
-        # Sidebar
-        sidebar = self._build_sidebar()
-        body_layout.addWidget(sidebar)
-
-        # Stacked tabs
+        # Stacked tabs (instantiated before sidebar so self._switch_tab(0) finds self.stack)
         self.stack = QStackedWidget()
         self.stack.setStyleSheet(f"QStackedWidget {{ background-color: {BG_DARK}; }}")
 
@@ -393,6 +389,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.threat_intel_tab) # 11
         self.stack.addWidget(self.logs_tab)         # 12
 
+        # Sidebar
+        sidebar = self._build_sidebar()
+        body_layout.addWidget(sidebar)
         body_layout.addWidget(self.stack)
         root_layout.addWidget(body, stretch=1)
 

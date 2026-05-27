@@ -292,14 +292,14 @@ QSplitter::handle {{
 
 def main() -> None:
     """Launch the NetWraith application."""
-    # Print custom ASCII banner
-    print(r"""
-      \ (oo)_____/       # NetWraith
-        (__)     )\
-            ||--||       [ Muhammad Taezeem Tariq Matta ]
-                         [ tg: t.me/Taezeem_14 ]
-                         [ github: taezeem14 ]
-    """)
+    # Print clean text header
+    print("==================================================")
+    print("                 🕸️  NetWraith                    ")
+    print("==================================================")
+    print("  Author: Muhammad Taezeem Tariq Matta")
+    print("  Telegram: t.me/Taezeem_14")
+    print("  GitHub: github.com/taezeem14")
+    print("==================================================")
 
     # High-DPI support (Qt6 enables it by default, but be explicit)
     app = QApplication(sys.argv)
