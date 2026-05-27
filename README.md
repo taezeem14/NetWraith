@@ -1,118 +1,202 @@
-# 🕷️ NetWraith
-### network security analysis. built different.
+<h1 align="center">🕷️ NetWraith v1.0</h1>
+<p align="center">
+  <b>The high-key aesthetic, low-key lethal network security analysis suite.</b>
+</p>
 
-[![Status](https://img.shields.io/badge/status-active-00e5ff.svg?style=flat-square)](#)
-[![Python](https://img.shields.io/badge/python-3.10+-bb86fc.svg?style=flat-square)](#)
-[![License](https://img.shields.io/badge/license-MIT-4caf50.svg?style=flat-square)](#)
-
-NetWraith is a high-key professional, low-key aesthetic network auditing and threat detection suite built with Python, PyQt6, and Scapy. Designed for systems administrators and security researchers who want Wireshark-level depth wrapped in a premium, flat-panel dark mode GUI.
-
-Because looking at terminal walls of text in 2026 is simply not the vibe, and legacy packet sniffers look like they were designed in the 90s.
-
----
-
-## ⚡ It's Giving...
-* **Main Character Visibility** — Real-time packet parsing, hex dumps, and layer breakdown with zero gatekeeping.
-* **No Cap Performance** — Native Python multithreading (`QThread`) keeps the UI highly responsive while Scapy handles raw sockets in the background.
-* **Receipts-Driven Security** — Persists anomalies to local logs and alerts you in real-time if someone starts acting sus on the subnet.
+<p align="center">
+  <img src="https://img.shields.io/badge/status-active-00e5ff.svg?style=for-the-badge" alt="Status" />
+  <img src="https://img.shields.io/badge/python-3.10+-bb86fc.svg?style=for-the-badge" alt="Python" />
+  <img src="https://img.shields.io/badge/license-MIT-4caf50.svg?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/PRs-welcome-ffb74d.svg?style=for-the-badge" alt="PRs Welcome" />
+</p>
 
 ---
 
-## 🖥️ Feature Breakdown
-
-### 📊 1. Dashboard Tab
-* Live pyqtgraph sparkline showing rolling packets/sec over the last 60 seconds (performance hits different).
-* Summary cards for active hosts, packets captured, alerts, and open ports.
-* Prepend list of recent alert logs for quick triage.
-
-### 🖥️ 2. Hosts (ARP Discovery) Tab
-* Subnet sweeps comparing discoveries against a `trusted_hosts.json` baseline.
-* Colored status badges to track device state: `TRUSTED` (green), `NEW` (cyan), `CHANGED` (amber), or `SUSPICIOUS` (red).
-* Context menus for fast actions: port scans, MAC copy, and vendor lookups.
-
-### 🛡️ 3. ARP Monitor Tab
-* Continuous monitoring for IP-MAC mapping mismatches.
-* Alerts you on unsolicited/gratuitous ARP replies that try to poison your routing table.
-* Re-baseline hosts in one click.
-
-### 🌐 4. DNS Monitor Tab
-* Live DNS query stream displaying domain requests and lookup latency.
-* Out-of-the-box anomaly detection: flags sus DNS tunneling (subdomains > 50 chars) and query rate spikes from single hosts.
-
-### 📦 5. Packet Inspector Tab
-* Raw packet streaming with protocol-specific color coding (TCP, UDP, ARP, ICMP, DNS).
-* Interactive layer tree (Ethernet ➔ IP ➔ TCP ➔ Payload) with hex dumps and decoded fields.
-* Save captures directly to standard `.pcap` files for deep Wireshark analysis.
-
-### 🔍 6. Port Scanner Tab
-* Highly parallel port scans using a configurable thread pool (1–500 threads).
-* Supports TCP Connect, SYN scans, and UDP checks.
-* Automated banner grabbing (256 bytes) and socket service identification.
-
-### 📡 7. Rogue DHCP Detector Tab
-* Dynamically learns the legitimate DHCP server from the first OFFER/ACK handshake.
-* Instantly alerts if an unauthorized server begins leasing IP addresses on the network.
-
-### 🔒 8. SSL/TLS Inspector Tab
-* Pulls full certificate chains from target endpoints.
-* Flags vulnerabilities: expired/expiring certs, self-signed signatures, weak hashing algorithms (MD5/SHA1), or domain name mismatches.
-
-### 🕷️ 9. MITM Detector Tab
-* 5-vector parallel detection engine checking for:
-  1. Gateway MAC alterations (critical severity)
-  2. Duplicate local IP conflicts
-  3. ICMP redirect packets (type 5)
-  4. Sudden gateway TTL shifts (indicates routing interception)
-  5. MAC conflict consistency (multiple IPs sharing the same MAC)
-
-### 📋 10. Unified Logs Tab
-* One-stop-shop for all security events and module exceptions.
-* Multi-parameter filter options (module, severity, timestamp) and persistent exports to CSV, JSON, or plain text.
+<div align="center">
+  <h3>
+    <a href="#-architecture">Architecture</a> •
+    <a href="#-features">Features</a> •
+    <a href="#-vibe-check-comparison">Vibe Check</a> •
+    <a href="#-installation">Installation</a> •
+    <a href="#-legal">Legal</a>
+  </h3>
+</div>
 
 ---
 
-## 🛠️ Stack & Aesthetic
-
-NetWraith uses a minimalist cyber-themed design palette:
-* **Background Dark:** `#0d0f14`
-* **Panel BG:** `#1a1d24`
-* **Accent Cyan:** `#00e5ff`
-* **Danger Red:** `#ff4c4c`
-
-We chose `pyqtgraph` over `matplotlib` for the rolling sparkline because rendering latency is simply not allowed.
+> [!WARNING]
+> **UNAUTHORIZED USE IS HIGH-KEY CRINGE AND ILLEGAL.**
+> Running packet sniffers or ARP spoof checkers on networks you don’t own or lack explicit written authorization to test violates local computer laws. Keep it in your lab environment. Protect your packets responsibly.
 
 ---
 
-## 🚀 Installation & Running
+## 🏗️ Architecture Flow
 
-### Requirements
-* Python 3.10+
-* **Administrative Privileges** (Scapy needs raw socket capabilities. Run terminal as Admin on Windows or with `sudo` on Linux).
-* **Npcap / libpcap** (Windows users: install [Npcap](https://npcap.com/) first. Linux users: `sudo apt install libpcap-dev`).
+NetWraith splits UI management and raw packet processing. Background modules leverage native Python threads to feed real-time events straight to the PyQt6 dashboard.
 
-### Quick Start
+```mermaid
+graph TD
+    %% Styling Nodes
+    classDef ui fill:#1a1d24,stroke:#00e5ff,stroke-width:2px,color:#ffffff;
+    classDef core fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff;
+    classDef data fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff;
+
+    subgraph UI_Layer ["🎨 UI Presentation Layer"]
+        MW[MainWindow]:::ui
+        DB[DashboardTab]:::ui
+        MITM[MITMTab]:::ui
+        PKT[PacketsTab]:::ui
+    end
+
+    subgraph Core_Engines ["⚙️ Scapy Thread Pools"]
+        MC[MITMDetectorThread]:::core
+        PE[PacketCaptureThread]:::core
+        AS[ScannerThread]:::core
+    end
+
+    subgraph Data_Layer ["📋 Persistent Data"]
+        TH[trusted_hosts.json]:::data
+        AL[alerts.log]:::data
+    end
+
+    %% Signal Connections
+    MW -->|Spins up| MC
+    MW -->|Spins up| PE
+    MW -->|Spins up| AS
+    
+    MC -->|emit: mitm_alert| MW
+    PE -->|emit: packet_captured| PKT
+    AS -->|compare against| TH
+    
+    MW -->|updates stats| DB
+    MC -->|updates checks| MITM
+    MW -->|writes alerts| AL
+```
+
+---
+
+## ⚡ The Feature Panels
+
+<table width="100%">
+  <tr>
+    <td width="50%">
+      <h3>📊 Dashboard Engine</h3>
+      <p>Features a custom 60-second rolling <code>pyqtgraph</code> sparkline tracking packets/sec with zero latency. Houses metric panels, recent alert logs, and quick action launch routes.</p>
+    </td>
+    <td width="50%">
+      <h3>🖥️ Subnet Host discovery</h3>
+      <p>Runs automated ARP sweeps. Compares discoveries against <code>trusted_hosts.json</code> to flag <code>NEW</code>, <code>CHANGED</code>, or <code>SUSPICIOUS</code> devices on the fly.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🛡️ ARP Poison Monitoring</h3>
+      <p>Sniffs incoming ARP replies to catch MAC spoofing, poisoning, or unsolicited gratuitous packets. Deduplicates spam alerts within a 30s window.</p>
+    </td>
+    <td width="50%">
+      <h3>🌐 DNS Tunnel Detector</h3>
+      <p>Tracks DNS queries over port 53. Flags suspected tunneling attempts (labels > 50 chars) and high rate queries from single nodes.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>📦 Packet Inspector</h3>
+      <p>Aesthetic color-coded stream (TCP, UDP, ARP, ICMP, DNS) with full hierarchical layer tree breakdown, hex dumps, and PCAP exports.</p>
+    </td>
+    <td width="50%">
+      <h3>🔍 Threaded Port Scanner</h3>
+      <p>Concurrent port sweeps (1–500 threads) supporting TCP Connect, SYN, and UDP scans with banner grabbing and port mapping.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>📡 Rogue DHCP Detector</h3>
+      <p>Caches the subnet's valid DHCP server lease configuration. Triggers warnings if a rogue lease offer is broadcasted.</p>
+    </td>
+    <td width="50%">
+      <h3>🔒 Certificate Inspector</h3>
+      <p>Extracts TLS cert paths. Validates signatures, expiration timelines, weak SHA1/MD5 algos, and subject CN name conflicts.</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🕵️ MITM Detection Stack
+
+NetWraith runs a dedicated 5-vector monitor to catch Man-in-the-Middle attacks before they compromise your data:
+
+> [!IMPORTANT]
+> **MITM Threat Vectors Checked:**
+> 1. **Gateway MAC Modification:** Detects when the gateway IP suddenly resolves to a different MAC address (indicating intercept).
+> 2. **Duplicate Local IP:** Sends ARP sweeps for the host's own IP to ensure no duplicate systems are spoofing identity.
+> 3. **ICMP Redirect Sniffing:** Flags ICMP type 5 packets suggesting bad routing updates.
+> 4. **Gateway TTL Shifts:** Flags sudden shifts in the gateway's time-to-live response bounds.
+> 5. **MAC Table Conflicts:** Flags when multiple distinct IPs map to a single hardware MAC.
+
+---
+
+## 📊 Vibe Check: Tool Comparison
+
+<div align="center">
+
+| Feature | NetWraith 🕷️ | Wireshark 🦈 | Bettercap 🧢 |
+| :--- | :---: | :---: | :---: |
+| **GUI Theme** | Cyber Dark (`#0d0f14`) | Classical Gray (looks old-school) | Terminal Only / Web GUI |
+| **ARP Spoof Alerts** | Automated / Deduplicated | Needs custom filters | Manual setups |
+| **MITM Checks** | 5 Vectors out-of-box | Manual PCAP inspection | Dynamic spoof tool |
+| **Learning Curve** | Zero (just click Proceed) | Requires a networking PhD | Needs CLI mastery |
+| **Aesthetic Graph** | Custom pyqtgraph sparkline | Heavy default plots | ASCII sparklines |
+
+</div>
+
+---
+
+## 🚀 Installation & Setup
+
+### Prerequisites
+
+> [!NOTE]
+> * **Python version:** 3.10+ (we're not living in the stone age).
+> * **Pcap Engine:** Windows users need [Npcap](https://npcap.com/) installed in WinPcap-compatibility mode. Linux/macOS users need `libpcap-dev`.
+> * **Privileges:** Admin/Sudo is mandatory for raw socket sniffing (without it, Scapy can't listen to packets).
+
+### Getting Started
+
 ```bash
 # Clone the repository
 git clone https://github.com/taezeem14/NetWraith.git
 cd NetWraith
 
-# Install dependencies (pure-Python dependencies install instantly)
+# Install pure-Python requirements (fast & pre-compiled)
 pip install -r requirements.txt
 
-# Run the analyzer (requires Admin/Sudo)
+# Run as administrator/root
 python netwraith.py
 ```
 
+<details>
+<summary><b>🛠️ Developer/No-Compiler Fallback Mode</b></summary>
+<p>
+If you run NetWraith on a system without compiler access (making <code>netifaces</code> unable to build), NetWraith automatically enables <b>Fallback Mode</b>:
+<ul>
+  <li>Resolves IP addresses using standard library <code>socket</code> lookups.</li>
+  <li>Enumerates network interfaces using Scapy's built-in adapter wrapper list.</li>
+  <li>Extracts gateway paths via active Scapy routing tables.</li>
+</ul>
+No crashes, no build errors—it just works.
+</p>
+</details>
+
 ---
 
-## ⚖️ Legal (Read the room)
+## ⚖️ Legal Policy
 
-> **FOR AUTHORIZED SECURITY RESEARCH & AUDITING ONLY.**
->
-> NetWraith is designed for educational labs, authorized network administration, and legitimate security audits. interception of traffic on networks you do not own or lack written permission to analyze is illegal and highly cringe.
->
-> Developers assume zero liability. The launch warning dialog cannot be bypassed or configured away. Protect your packets responsibly.
+> [!CAUTION]
+> NetWraith is built purely for authorized security assessments, network research, and academic labs. The creators assume zero responsibility for malicious use. The modal warning dialog shown on launch cannot be turned off. Use responsibly.
 
 ---
 
-*Made with 💀, energy drinks, and zero tolerance for basic interfaces.*
+<p align="center">
+  <sub>Made with 💀, energy drinks, and zero tolerance for default Windows styles.</sub>
+</p>
