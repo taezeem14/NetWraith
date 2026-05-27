@@ -36,41 +36,40 @@ NetWraith splits UI management and raw packet processing. Background modules lev
 
 ```mermaid
 graph TD
+    %% Define clean hierarchy
+    A["netwraith.py<br>(Entry App)"] --> B["ui/warning_dialog.py<br>(Legal Modal Warning)"]
+    B --> C["ui/main_window.py<br>(MainWindow Controller)"]
+    
+    %% Hub routes to UI Tabs
+    C --> D["ui/dashboard_tab.py<br>(Dashboard GUI)"]
+    C --> E["ui/mitm_tab.py<br>(MITM GUI)"]
+    C --> F["ui/packets_tab.py<br>(Packets GUI)"]
+    C --> G["ui/hosts_tab.py<br>(Hosts GUI)"]
+    
+    %% Hub spins up QThreads in Core
+    C -.-> H["core/scanner.py<br>(ARP Sweep Thread)"]
+    C -.-> I["core/packet_engine.py<br>(Sniffing Thread)"]
+    C -.-> J["core/mitm_detector.py<br>(MITM Detector Thread)"]
+    
+    %% Core engines write to files & feed signals
+    H --> K[("data/trusted_hosts.json<br>(Local Database)")]
+    I --> F
+    J --> E
+    J --> L[("data/alerts.log<br>(Persistent Alerts)")]
+    
     %% Styling Nodes
-    classDef ui fill:#1a1d24,stroke:#00e5ff,stroke-width:2px,color:#ffffff;
-    classDef core fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff;
-    classDef data fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff;
-
-    subgraph UI_Layer ["🎨 UI Presentation Layer"]
-        MW[MainWindow]:::ui
-        DB[DashboardTab]:::ui
-        MITM[MITMTab]:::ui
-        PKT[PacketsTab]:::ui
-    end
-
-    subgraph Core_Engines ["⚙️ Scapy Thread Pools"]
-        MC[MITMDetectorThread]:::core
-        PE[PacketCaptureThread]:::core
-        AS[ScannerThread]:::core
-    end
-
-    subgraph Data_Layer ["📋 Persistent Data"]
-        TH[trusted_hosts.json]:::data
-        AL[alerts.log]:::data
-    end
-
-    %% Signal Connections
-    MW -->|Spins up| MC
-    MW -->|Spins up| PE
-    MW -->|Spins up| AS
-    
-    MC -->|emit: mitm_alert| MW
-    PE -->|emit: packet_captured| PKT
-    AS -->|compare against| TH
-    
-    MW -->|updates stats| DB
-    MC -->|updates checks| MITM
-    MW -->|writes alerts| AL
+    style A fill:#0d0f14,stroke:#2a2d35,stroke-width:2px,color:#ffffff
+    style B fill:#0d0f14,stroke:#ff4c4c,stroke-width:2px,color:#ffffff
+    style C fill:#1a1d24,stroke:#00e5ff,stroke-width:2px,color:#ffffff
+    style D fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style E fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style F fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style G fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style H fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style I fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style J fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style K fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff
+    style L fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff
 ```
 
 ---
