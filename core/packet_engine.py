@@ -95,28 +95,38 @@ class PacketCaptureThread(QThread):
             return {}
 
         pkt = self._packets[index]
+        raw_hex_str = self._hex_dump(bytes(pkt))
+
+        try:
+            decoded_str = pkt.show(dump=True)
+        except Exception as exc:
+            decoded_str = f"Error decoding packet: {exc}"
+
         detail: dict = {
             "number": index + 1,
-            "raw_hex": self._hex_dump(bytes(pkt)),
+            "raw_hex": raw_hex_str,
+            "hex_dump": raw_hex_str,
+            "decoded": decoded_str,
             "layers": [],
         }
 
         layer = pkt
         while layer:
-            layer_info: dict = {
-                "name": layer.__class__.__name__,
-                "fields": {},
-            }
+            fields_list = []
             for field in layer.fields_desc:
                 fname = field.name
                 try:
                     val = getattr(layer, fname, None)
-                    # Convert bytes to hex string for readability
                     if isinstance(val, bytes):
                         val = val.hex()
-                    layer_info["fields"][fname] = str(val)
+                    fields_list.append({"name": fname, "value": str(val)})
                 except Exception:
-                    layer_info["fields"][fname] = "?"
+                    fields_list.append({"name": fname, "value": "?"})
+
+            layer_info: dict = {
+                "name": layer.__class__.__name__,
+                "fields": fields_list,
+            }
             detail["layers"].append(layer_info)
             layer = layer.payload if layer.payload and not isinstance(layer.payload, bytes) else None
 

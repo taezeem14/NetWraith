@@ -785,15 +785,17 @@ class MainWindow(QMainWindow):
         if hasattr(self.mitm_tab, "detection_toggled"):
             self.mitm_tab.detection_toggled.connect(self._on_mitm_toggled)
 
+        # ARP Tab baseline snapshot requested
+        if hasattr(self.arp_tab, "baseline_requested"):
+            self.arp_tab.baseline_requested.connect(self._on_arp_baseline_requested)
+
         # 9 ── Dashboard quick-action buttons
-        if hasattr(self.dashboard_tab, "quick_scan_clicked"):
-            self.dashboard_tab.quick_scan_clicked.connect(self._dashboard_quick_scan)
-        if hasattr(self.dashboard_tab, "quick_arp_clicked"):
-            self.dashboard_tab.quick_arp_clicked.connect(self._dashboard_quick_arp)
-        if hasattr(self.dashboard_tab, "quick_dns_clicked"):
-            self.dashboard_tab.quick_dns_clicked.connect(self._dashboard_quick_dns)
-        if hasattr(self.dashboard_tab, "quick_packets_clicked"):
-            self.dashboard_tab.quick_packets_clicked.connect(self._dashboard_quick_packets)
+        if hasattr(self.dashboard_tab, "action_arp_scan"):
+            self.dashboard_tab.action_arp_scan.connect(self._dashboard_quick_scan)
+        if hasattr(self.dashboard_tab, "action_dns_sniff"):
+            self.dashboard_tab.action_dns_sniff.connect(self._dashboard_quick_dns)
+        if hasattr(self.dashboard_tab, "action_port_scan"):
+            self.dashboard_tab.action_port_scan.connect(self._dashboard_quick_port_scan)
 
     # ────────────────────────────── 1. Host Scan ──────────────────────────
     @pyqtSlot(str)
@@ -838,9 +840,24 @@ class MainWindow(QMainWindow):
     def _on_arp_toggled(self, start: bool) -> None:
         if start:
             iface = self._get_selected_iface()
-            gateway = self._get_gateway()
-            self._arp_thread = ARPMonitorThread(iface, gateway)
+            self._arp_thread = ARPMonitorThread(iface)
             self._register_thread(self._arp_thread)
+            
+            # Load baseline from trusted_hosts.json
+            baseline_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "trusted_hosts.json")
+            hosts = {}
+            if os.path.isfile(baseline_path):
+                try:
+                    with open(baseline_path, "r", encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    if isinstance(data, dict):
+                        hosts = {ip: h.get("mac", "") for ip, h in data.items() if "mac" in h}
+                    elif isinstance(data, list):
+                        hosts = {h["ip"]: h.get("mac", "") for h in data if "ip" in h and "mac" in h}
+                except Exception as exc:
+                    logger.warning("Could not load trusted hosts for ARP monitor baseline: %s", exc)
+            self._arp_thread.set_baseline(hosts)
+
             if hasattr(self._arp_thread, "arp_alert"):
                 self._arp_thread.arp_alert.connect(self._on_arp_alert)
             if hasattr(self._arp_thread, "arp_packet"):
@@ -861,6 +878,24 @@ class MainWindow(QMainWindow):
             self.arp_tab.add_alert(alert_data)
         self._add_log("ALERT", msg)
         self._tray_notify("ARP Alert", msg)
+
+    @pyqtSlot()
+    def _on_arp_baseline_requested(self) -> None:
+        if self._arp_thread and self._arp_thread.isRunning():
+            baseline_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "trusted_hosts.json")
+            hosts = {}
+            if os.path.isfile(baseline_path):
+                try:
+                    with open(baseline_path, "r", encoding="utf-8") as fh:
+                        data = json.load(fh)
+                    if isinstance(data, dict):
+                        hosts = {ip: h.get("mac", "") for ip, h in data.items() if "mac" in h}
+                    elif isinstance(data, list):
+                        hosts = {h["ip"]: h.get("mac", "") for h in data if "ip" in h and "mac" in h}
+                except Exception as exc:
+                    logger.warning("Could not load trusted hosts for ARP monitor baseline: %s", exc)
+            self._arp_thread.set_baseline(hosts)
+            self._add_log("INFO", "ARP Monitor baseline reloaded on the fly.")
 
     # ────────────────────────────── 3. DNS Sniffer ───────────────────────
     @pyqtSlot(bool)
@@ -914,32 +949,61 @@ class MainWindow(QMainWindow):
     @pyqtSlot(dict)
     def _on_packet_captured(self, pkt_data: dict) -> None:
         self._packet_count += 1
+        # Map src_ip -> src, dst_ip -> dst to match PacketsTab keys
+        if "src_ip" in pkt_data:
+            pkt_data["src"] = pkt_data["src_ip"]
+        if "dst_ip" in pkt_data:
+            pkt_data["dst"] = pkt_data["dst_ip"]
+        
+        # Get detailed layer breakdown
+        if self._packet_thread:
+            idx = pkt_data.get("number", self._packet_count) - 1
+            pkt_data["detail"] = self._packet_thread.get_packet_detail(idx)
+
         if hasattr(self.packets_tab, "add_packet"):
             self.packets_tab.add_packet(pkt_data)
         if hasattr(self.dashboard_tab, "update_packet_count"):
             self.dashboard_tab.update_packet_count(self._packet_count)
 
     # ────────────────────────────── 5. Port Scanner ──────────────────────
-    @pyqtSlot(str, str)
-    def _on_port_scan_requested(self, target: str, ports: str) -> None:
+    @pyqtSlot(str, tuple, str, int)
+    def _on_port_scan_requested(self, target: str, port_range: tuple[int, int], scan_type: str, threads: int) -> None:
         if self._port_scanner_thread and self._port_scanner_thread.isRunning():
             self._port_scanner_thread.stop()
             self._port_scanner_thread.wait(2000)
 
+        # Convert scan_type to the format expected by the backend engine (lowercase with underscores)
+        # Tab sends "TCP Connect", "SYN Scan", "UDP Scan"
+        engine_type = "tcp_connect"
+        t_lower = scan_type.lower()
+        if "syn" in t_lower:
+            engine_type = "syn"
+        elif "udp" in t_lower:
+            engine_type = "udp"
+
         self._port_scanner_thread = PortScannerThread(
-            target, ports, timeout=self._settings["scan_timeout"]
+            target_ip=target,
+            port_range=port_range,
+            scan_type=engine_type,
+            thread_count=threads
         )
         self._register_thread(self._port_scanner_thread)
         if hasattr(self._port_scanner_thread, "port_result"):
             if hasattr(self.ports_tab, "add_port_result"):
                 self._port_scanner_thread.port_result.connect(self.ports_tab.add_port_result)
+        if hasattr(self._port_scanner_thread, "scan_progress"):
+            if hasattr(self.ports_tab, "set_progress"):
+                self._port_scanner_thread.scan_progress.connect(self.ports_tab.set_progress)
         if hasattr(self._port_scanner_thread, "scan_complete"):
-            self._port_scanner_thread.scan_complete.connect(
-                lambda: self._add_log("INFO", f"Port scan completed for {target}")
-            )
+            self._port_scanner_thread.scan_complete.connect(self._on_port_scan_complete)
         if hasattr(self._port_scanner_thread, "error_signal"):
             self._port_scanner_thread.error_signal.connect(self._on_engine_error)
         self._port_scanner_thread.start()
+
+    def _on_port_scan_complete(self, results: list) -> None:
+        self._add_log("INFO", "Port scan completed.")
+        if hasattr(self.ports_tab, "set_scanning"):
+            self.ports_tab.set_scanning(False)
 
     # ────────────────────────────── 6. DHCP Watcher ──────────────────────
     @pyqtSlot(bool)
@@ -948,9 +1012,9 @@ class MainWindow(QMainWindow):
             iface = self._get_selected_iface()
             self._dhcp_thread = DHCPWatcherThread(iface)
             self._register_thread(self._dhcp_thread)
-            if hasattr(self._dhcp_thread, "dhcp_offer"):
-                if hasattr(self.dhcp_tab, "add_dhcp_entry"):
-                    self._dhcp_thread.dhcp_offer.connect(self.dhcp_tab.add_dhcp_entry)
+            if hasattr(self._dhcp_thread, "dhcp_event"):
+                if hasattr(self.dhcp_tab, "add_dhcp_event"):
+                    self._dhcp_thread.dhcp_event.connect(self.dhcp_tab.add_dhcp_event)
             if hasattr(self._dhcp_thread, "rogue_alert"):
                 self._dhcp_thread.rogue_alert.connect(self._on_dhcp_rogue_alert)
             if hasattr(self._dhcp_thread, "error_signal"):
@@ -962,21 +1026,27 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(dict)
     def _on_dhcp_rogue_alert(self, data: dict) -> None:
-        msg = data.get("message", "Rogue DHCP server detected!")
+        msg = data.get("description", "Rogue DHCP server detected!")
         self._increment_alert()
         self._add_log("CRITICAL", msg)
         self._tray_notify("DHCP Alert", msg)
-        if hasattr(self.dhcp_tab, "add_rogue_alert"):
-            self.dhcp_tab.add_rogue_alert(data)
+        if hasattr(self.dhcp_tab, "add_alert"):
+            # Prepare alert dictionary format expected by DHCPTab.add_alert
+            alert_formatted = {
+                "timestamp": data.get("timestamp", datetime.now().strftime("%H:%M:%S")),
+                "severity": "CRITICAL",
+                "message": msg
+            }
+            self.dhcp_tab.add_alert(alert_formatted)
 
     # ────────────────────────────── 7. SSL Inspector ─────────────────────
-    @pyqtSlot(str, int)
-    def _on_ssl_inspect_requested(self, host: str, port: int) -> None:
+    @pyqtSlot(list)
+    def _on_ssl_inspect_requested(self, targets: list[str]) -> None:
         if self._ssl_thread and self._ssl_thread.isRunning():
             self._ssl_thread.stop()
             self._ssl_thread.wait(2000)
 
-        self._ssl_thread = SSLInspectorThread(host, port)
+        self._ssl_thread = SSLInspectorThread(targets)
         self._register_thread(self._ssl_thread)
         if hasattr(self._ssl_thread, "cert_result"):
             if hasattr(self.ssl_tab, "add_cert_result"):
@@ -1027,20 +1097,14 @@ class MainWindow(QMainWindow):
         if ip_range:
             self._on_host_scan_requested(ip_range)
 
-    def _dashboard_quick_arp(self) -> None:
-        self._switch_tab(2)
-        if hasattr(self.arp_tab, "monitoring_toggled"):
-            self._on_arp_toggled(True)
-
     def _dashboard_quick_dns(self) -> None:
-        self._switch_tab(3)
-        if hasattr(self.dns_tab, "sniffing_toggled"):
-            self._on_dns_toggled(True)
+        self._switch_tab(3)  # switch to DNS Monitor
+        if hasattr(self.dns_tab, "set_monitoring"):
+            self.dns_tab.set_monitoring(True)
+        self._on_dns_toggled(True)
 
-    def _dashboard_quick_packets(self) -> None:
-        self._switch_tab(4)
-        if not self._monitoring:
-            self._toggle_monitoring()
+    def _dashboard_quick_port_scan(self) -> None:
+        self._switch_tab(5)  # switch to Ports Tab
 
     # ==================================================================== #
     #                      LOGGING / ALERT HELPERS                           #

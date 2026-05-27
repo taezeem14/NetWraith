@@ -379,3 +379,7 @@ class HostsTab(QWidget):
                 writer.writerow(row_data)
 
         self._status_label.setText(f"Exported {self._table.rowCount()} hosts to {path}")
+
+    def get_host_count(self) -> int:
+        return self._table.rowCount()
+
