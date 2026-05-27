@@ -26,7 +26,7 @@
 
 > [!WARNING]
 > **UNAUTHORIZED USE IS HIGH-KEY CRINGE AND ILLEGAL.**
-> Running packet sniffers or ARP spoof checkers on networks you don’t own or lack explicit written authorization to test violates local computer laws. Keep it in your lab environment. Protect your packets responsibly.
+> Running packet sniffers or auditing networks you don’t own or lack explicit written authorization to test violates local computer laws. Keep it in your lab environment. Protect your packets responsibly.
 
 ---
 
@@ -45,16 +45,26 @@ graph TD
     C --> E["ui/mitm_tab.py<br>(MITM GUI)"]
     C --> F["ui/packets_tab.py<br>(Packets GUI)"]
     C --> G["ui/hosts_tab.py<br>(Hosts GUI)"]
+    C --> M["ui/topology_tab.py<br>(Topology GUI)"]
+    C --> N["ui/wifi_tab.py<br>(Wi-Fi GUI)"]
+    C --> O["ui/threat_intel_tab.py<br>(Threat Intel GUI)"]
     
     %% Hub spins up QThreads in Core
     C -.-> H["core/scanner.py<br>(ARP Sweep Thread)"]
     C -.-> I["core/packet_engine.py<br>(Sniffing Thread)"]
     C -.-> J["core/mitm_detector.py<br>(MITM Detector Thread)"]
+    C -.-> P["core/wifi_scanner.py<br>(Wi-Fi Scan Thread)"]
+    C -.-> Q["core/threat_intel.py<br>(Threat Intel Thread)"]
+    
+    %% OS Fingerprint helper
+    I -.-> R["core/os_fingerprint.py<br>(Passive OS Guess)"]
     
     %% Core engines write to files & feed signals
     H --> K[("data/trusted_hosts.json<br>(Local Database)")]
     I --> F
     J --> E
+    P --> N
+    Q --> O
     J --> L[("data/alerts.log<br>(Persistent Alerts)")]
     
     %% Styling Nodes
@@ -65,9 +75,15 @@ graph TD
     style E fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
     style F fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
     style G fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style M fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style N fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
+    style O fill:#1a1d24,stroke:#2a2d35,stroke-width:1px,color:#ffffff
     style H fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
     style I fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
     style J fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style P fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style Q fill:#0d0f14,stroke:#bb86fc,stroke-width:2px,color:#ffffff
+    style R fill:#0d0f14,stroke:#00e5ff,stroke-width:1px,color:#ffffff
     style K fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff
     style L fill:#2a2d35,stroke:#ffb74d,stroke-width:1px,color:#ffffff
 ```
@@ -83,8 +99,18 @@ graph TD
       <p>Features a custom 60-second rolling <code>pyqtgraph</code> sparkline tracking packets/sec with zero latency. Houses metric panels, recent alert logs, and quick action launch routes.</p>
     </td>
     <td width="50%">
-      <h3>🖥️ Subnet Host discovery</h3>
+      <h3>🕸️ Interactive 2D Topology Map</h3>
+      <p>Plots discovered network hosts in a live 2D draggable layout centered around the default gateway. Colored by status, double-clicking any host opens port scanning directly.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🖥️ Subnet Host Discovery</h3>
       <p>Runs automated ARP sweeps. Compares discoveries against <code>trusted_hosts.json</code> to flag <code>NEW</code>, <code>CHANGED</code>, or <code>SUSPICIOUS</code> devices on the fly.</p>
+    </td>
+    <td width="50%">
+      <h3>🕵️ Passive OS Fingerprinting</h3>
+      <p>Analyzes TTL, Window size, and Don't Fragment (DF) flags from real-time TCP packet headers to passively profile device operating systems without active scans.</p>
     </td>
   </tr>
   <tr>
@@ -117,6 +143,16 @@ graph TD
       <p>Extracts TLS cert paths. Validates signatures, expiration timelines, weak SHA1/MD5 algos, and subject CN name conflicts.</p>
     </td>
   </tr>
+  <tr>
+    <td width="50%">
+      <h3>📶 Wi-Fi Spectrum Auditor</h3>
+      <p>Audits local 2.4 GHz and 5 GHz airwaves. Generates a live PyQtGraph channel curve visualization showing signal overlap and wireless channel congestion.</p>
+    </td>
+    <td width="50%">
+      <h3>🌍 Threat Intelligence & GeoIP</h3>
+      <p>Profiles destination IP addresses captured from public packets in real-time, fetching country, ISP, and organization details, alongside calculated threat metrics.</p>
+    </td>
+  </tr>
 </table>
 
 ---
@@ -142,6 +178,9 @@ NetWraith runs a dedicated 5-vector monitor to catch Man-in-the-Middle attacks b
 | Feature | NetWraith 🕷️ | Wireshark 🦈 | Bettercap 🧢 |
 | :--- | :---: | :---: | :---: |
 | **GUI Theme** | Cyber Dark (`#0d0f14`) | Classical Gray (looks old-school) | Terminal Only / Web GUI |
+| **2D Topology Graph** | Live, draggable, interactive | None (text protocols only) | Basic text layout |
+| **Spectrum Analysis** | Overlapping signal bell curves | None | Text-based channels |
+| **OS Fingerprinting** | Passive, real-time guessing | Heavy manual inspection | Active scanning only |
 | **ARP Spoof Alerts** | Automated / Deduplicated | Needs custom filters | Manual setups |
 | **MITM Checks** | 5 Vectors out-of-box | Manual PCAP inspection | Dynamic spoof tool |
 | **Learning Curve** | Zero (just click Proceed) | Requires a networking PhD | Needs CLI mastery |
@@ -197,5 +236,5 @@ No crashes, no build errors—it just works.
 ---
 
 <p align="center">
-  <sub>Made with 💀, energy drinks, and zero tolerance for default Windows styles.</sub>
+  <sub>Made with 💀, energy drinks, and zero tolerance for default Windows styles by Muhammad Taezeem Tariq Matta.</sub>
 </p>
