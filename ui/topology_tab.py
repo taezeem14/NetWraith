@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QGraphicsSimpleTextItem
 )
 from PyQt6.QtCore import Qt, QPointF
-from PyQt6.QtGui import QColor, QFont, QPen, QBrush
+from PyQt6.QtGui import QColor, QFont, QPen, QBrush, QPainter
 
 # Theme Constants
 BG_DARK = "#0d0f14"
@@ -146,7 +146,7 @@ class TopologyTab(QWidget):
         self.scene.setSceneRect(-300, -300, 600, 600)
 
         self.view = QGraphicsView(self.scene)
-        self.view.setRenderHint(Qt.RenderHint.Antialiasing)
+        self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.setStyleSheet(f"""
             QGraphicsView {{
                 border: 1px solid {BORDER_COLOR};
