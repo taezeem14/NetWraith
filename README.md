@@ -1,4 +1,4 @@
-<h1 align="center">🕷️ NetWraith v1.0</h1>
+<h1 align="center">🕷️ NetWraith</h1>
 <p align="center">
   <b>The high-key aesthetic, low-key lethal network security analysis suite.</b>
 </p>

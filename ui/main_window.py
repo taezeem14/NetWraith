@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("NetWraith v1.0 | Network Security Analyzer")
+        self.setWindowTitle("NetWraith | Network Security Analyzer")
         self.setMinimumSize(1280, 780)
         self.resize(1440, 880)
 
@@ -417,8 +417,8 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
 
-        # Version label at bottom
-        ver_label = QLabel("  v1.0.0")
+        # Author label at bottom
+        ver_label = QLabel("  by Taezeem Tariq")
         ver_label.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; padding: 6px; background: transparent;")
         layout.addWidget(ver_label)
 
@@ -1146,7 +1146,7 @@ class MainWindow(QMainWindow):
         else:
             # Fallback to application icon
             self._tray_icon.setIcon(self.windowIcon() if not self.windowIcon().isNull() else QIcon())
-        self._tray_icon.setToolTip("NetWraith v1.0")
+        self._tray_icon.setToolTip("NetWraith")
 
         tray_menu = QMenu(self)
         show_action = QAction("Show / Hide", self)
@@ -1239,12 +1239,21 @@ class MainWindow(QMainWindow):
             self._add_log("INFO", "Settings updated.")
 
     def _show_about(self) -> None:
+        banner_html = (
+            "<pre style='font-family: \"Consolas\", \"Courier New\", monospace; color: #00e5ff; font-size: 11px; line-height: 1.2;'>"
+            "      \\ (oo)_____/       # NetWraith\n"
+            "        (__)     )\\\n"
+            "            ||--||       [ Muhammad Taezeem Tariq Matta ]\n"
+            "                         [ tg: t.me/Taezeem_14 ]\n"
+            "                         [ github: taezeem14 ]"
+            "</pre>"
+        )
         QMessageBox.about(
             self,
             "About NetWraith",
-            "<h2 style='color:#00e5ff;'>🕸️ NetWraith v1.0</h2>"
+            "<h2 style='color:#00e5ff;'>🕸️ NetWraith</h2>"
             "<p><b>Network Security Analyzer</b></p>"
-            "<p>Built with PyQt6 + Scapy</p>"
+            + banner_html +
             "<p style='color:#8a8f98;'>Real-time network monitoring, host discovery, "
             "ARP spoofing detection, DNS monitoring, packet capture, port scanning, "
             "DHCP rogue detection, SSL/TLS inspection, and MITM detection.</p>"

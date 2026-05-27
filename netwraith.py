@@ -1,5 +1,5 @@
 """
-NetWraith v1.0 — Network Security Analyzer
+NetWraith — Network Security Analyzer
 ===========================================
 
 Entry point for the application.  Applies the global dark theme stylesheet,
@@ -292,11 +292,20 @@ QSplitter::handle {{
 
 def main() -> None:
     """Launch the NetWraith application."""
+    # Print custom ASCII banner
+    print(r"""
+      \ (oo)_____/       # NetWraith
+        (__)     )\
+            ||--||       [ Muhammad Taezeem Tariq Matta ]
+                         [ tg: t.me/Taezeem_14 ]
+                         [ github: taezeem14 ]
+    """)
+
     # High-DPI support (Qt6 enables it by default, but be explicit)
     app = QApplication(sys.argv)
     app.setApplicationName("NetWraith")
-    app.setApplicationVersion("1.0")
     app.setOrganizationName("NetWraith")
+
 
     # ---- Application icon (graceful fallback if missing) ----
     icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.png")
