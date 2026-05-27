@@ -27,7 +27,7 @@ SUCCESS_GREEN = "#4caf50"
 PURPLE = "#bb86fc"
 
 # ── Column definitions ───────────────────────────────────────────────────────
-_COLUMNS = ["#", "IP Address", "MAC Address", "Vendor", "Hostname", "Status", "First Seen", "Last Seen"]
+_COLUMNS = ["#", "IP Address", "MAC Address", "Vendor", "Hostname", "OS Guess", "Status", "First Seen", "Last Seen"]
 
 # ── Shared styles ────────────────────────────────────────────────────────────
 _TABLE_STYLE = f"""
@@ -220,9 +220,10 @@ class HostsTab(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
 
         root.addWidget(self._table, stretch=1)
 
@@ -276,13 +277,14 @@ class HostsTab(QWidget):
         self._table.setItem(row, 2, _item(host_dict.get("mac", "")))
         self._table.setItem(row, 3, _item(host_dict.get("vendor", "Unknown")))
         self._table.setItem(row, 4, _item(host_dict.get("hostname", "")))
+        self._table.setItem(row, 5, _item(host_dict.get("os_guess", "Unknown")))
 
         status = host_dict.get("status", "NEW")
-        self._table.setItem(row, 5, _make_status_item(status))
+        self._table.setItem(row, 6, _make_status_item(status))
 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._table.setItem(row, 6, _item(host_dict.get("first_seen", now_str)))
-        self._table.setItem(row, 7, _item(host_dict.get("last_seen", now_str)))
+        self._table.setItem(row, 7, _item(host_dict.get("first_seen", now_str)))
+        self._table.setItem(row, 8, _item(host_dict.get("last_seen", now_str)))
 
         self._host_count_label.setText(f"Hosts: {self._table.rowCount()}")
 

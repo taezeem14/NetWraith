@@ -76,6 +76,9 @@ from ui.dhcp_tab import DHCPTab
 from ui.ssl_tab import SSLTab
 from ui.mitm_tab import MITMTab
 from ui.logs_tab import LogsTab
+from ui.topology_tab import TopologyTab
+from ui.wifi_tab import WiFiTab
+from ui.threat_intel_tab import ThreatIntelTab
 
 # ---------------------------------------------------------------------------
 # Core engine threads
@@ -88,6 +91,8 @@ from core.port_scanner import PortScannerThread
 from core.dhcp_watcher import DHCPWatcherThread
 from core.ssl_inspector import SSLInspectorThread
 from core.mitm_detector import MITMDetectorThread
+from core.wifi_scanner import WiFiScannerThread
+from core.threat_intel import ThreatIntelThread
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +204,9 @@ class MainWindow(QMainWindow):
         ("📡", "DHCP Detector"),
         ("🔒", "SSL Inspector"),
         ("🕷️", "MITM Detector"),
+        ("🕸️", "Topology"),
+        ("📶", "Wi-Fi Auditor"),
+        ("🌍", "Threat Intel"),
         ("📋", "Logs"),
     ]
 
@@ -229,6 +237,9 @@ class MainWindow(QMainWindow):
         self._dhcp_thread: Optional[DHCPWatcherThread] = None
         self._ssl_thread: Optional[SSLInspectorThread] = None
         self._mitm_thread: Optional[MITMDetectorThread] = None
+        self._wifi_scanner_thread: Optional[WiFiScannerThread] = None
+        self._threat_intel_thread: Optional[ThreatIntelThread] = None
+        self._discovered_hosts: list[dict] = []
 
         # ---- Build the UI ---------------------------------------------------
         self._build_menu_bar()
@@ -363,6 +374,9 @@ class MainWindow(QMainWindow):
         self.dhcp_tab = DHCPTab()
         self.ssl_tab = SSLTab()
         self.mitm_tab = MITMTab()
+        self.topology_tab = TopologyTab(double_click_callback=self._on_topology_double_clicked)
+        self.wifi_tab = WiFiTab()
+        self.threat_intel_tab = ThreatIntelTab()
         self.logs_tab = LogsTab()
 
         self.stack.addWidget(self.dashboard_tab)   # 0
@@ -374,7 +388,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.dhcp_tab)         # 6
         self.stack.addWidget(self.ssl_tab)          # 7
         self.stack.addWidget(self.mitm_tab)         # 8
-        self.stack.addWidget(self.logs_tab)         # 9
+        self.stack.addWidget(self.topology_tab)     # 9
+        self.stack.addWidget(self.wifi_tab)         # 10
+        self.stack.addWidget(self.threat_intel_tab) # 11
+        self.stack.addWidget(self.logs_tab)         # 12
 
         body_layout.addWidget(self.stack)
         root_layout.addWidget(body, stretch=1)
@@ -418,7 +435,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         # Author label at bottom
-        ver_label = QLabel("  by Taezeem Tariq")
+        ver_label = QLabel("  by Muhammad Taezeem Tariq Matta")
         ver_label.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; padding: 6px; background: transparent;")
         layout.addWidget(ver_label)
 
@@ -797,6 +814,14 @@ class MainWindow(QMainWindow):
         if hasattr(self.dashboard_tab, "action_port_scan"):
             self.dashboard_tab.action_port_scan.connect(self._dashboard_quick_port_scan)
 
+        # 10 ── Wi-Fi Spectrum Auditor signals
+        if hasattr(self.wifi_tab, "scan_requested"):
+            self.wifi_tab.scan_requested.connect(self._on_wifi_scan_requested)
+
+        # 11 ── Threat Intelligence signals
+        if hasattr(self.threat_intel_tab, "monitoring_toggled"):
+            self.threat_intel_tab.monitoring_toggled.connect(self._on_threat_monitoring_toggled)
+
     # ────────────────────────────── 1. Host Scan ──────────────────────────
     @pyqtSlot(str)
     def _on_host_scan_requested(self, target: str) -> None:
@@ -810,12 +835,17 @@ class MainWindow(QMainWindow):
             return
 
         iface = self._get_selected_iface()
-        self._scanner_thread = ScannerThread(ip_range, iface, timeout=self._settings["scan_timeout"])
+        baseline_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "trusted_hosts.json")
+        self._scanner_thread = ScannerThread(ip_range, baseline_path, iface, timeout=self._settings["scan_timeout"])
         self._register_thread(self._scanner_thread)
+        self._discovered_hosts = []
+        if hasattr(self.topology_tab, "clear_topology"):
+            self.topology_tab.clear_topology()
 
         # Wire scanner signals
         if hasattr(self._scanner_thread, "host_found"):
             self._scanner_thread.host_found.connect(self.hosts_tab.add_host)
+            self._scanner_thread.host_found.connect(self._on_host_found)
         if hasattr(self._scanner_thread, "scan_complete"):
             self._scanner_thread.scan_complete.connect(self._on_host_scan_complete)
         if hasattr(self._scanner_thread, "error_signal"):
@@ -964,6 +994,17 @@ class MainWindow(QMainWindow):
             self.packets_tab.add_packet(pkt_data)
         if hasattr(self.dashboard_tab, "update_packet_count"):
             self.dashboard_tab.update_packet_count(self._packet_count)
+
+        # Feed external destination IP to the Threat Intel Engine if monitoring is active
+        dst_ip = pkt_data.get("dst_ip", "")
+        if dst_ip and self._threat_intel_thread and self._threat_intel_thread.isRunning():
+            try:
+                ip_obj = ipaddress.ip_address(dst_ip)
+                if not (ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_multicast or ip_obj.is_link_local):
+                    self.threat_intel_tab.add_external_ip(dst_ip)
+                    self._threat_intel_thread.add_ip(dst_ip)
+            except ValueError:
+                pass
 
     # ────────────────────────────── 5. Port Scanner ──────────────────────
     @pyqtSlot(str, tuple, str, int)
@@ -1284,3 +1325,58 @@ class MainWindow(QMainWindow):
         self.stop_all_threads()
         self._tray_icon.hide()
         QApplication.quit()
+
+    @pyqtSlot(dict)
+    def _on_host_found(self, host_dict: dict) -> None:
+        """Called when ScannerThread discovers a host. Update topology scene."""
+        self._discovered_hosts.append(host_dict)
+        gateway_ip = self._get_gateway()
+        if hasattr(self.topology_tab, "update_nodes"):
+            self.topology_tab.update_nodes(self._discovered_hosts, gateway_ip)
+
+    # ────────────────────────────── 9. Wi-Fi Scanner ───────────────────────
+    @pyqtSlot()
+    def _on_wifi_scan_requested(self) -> None:
+        """Trigger a background Wi-Fi channel spectrum scan."""
+        if self._wifi_scanner_thread and self._wifi_scanner_thread.isRunning():
+            return
+        
+        self.wifi_tab.set_scanning(True)
+        self._wifi_scanner_thread = WiFiScannerThread()
+        self._register_thread(self._wifi_scanner_thread)
+        
+        self._wifi_scanner_thread.scan_complete.connect(self._on_wifi_scan_complete)
+        self._wifi_scanner_thread.error_signal.connect(self._on_engine_error)
+        self._wifi_scanner_thread.start()
+
+    @pyqtSlot(list)
+    def _on_wifi_scan_complete(self, networks: list) -> None:
+        self.wifi_tab.set_networks(networks)
+        self.wifi_tab.set_scanning(False)
+        self._add_log("INFO", f"Wi-Fi spectrum scan completed. Discovered {len(networks)} network(s).")
+
+    # ────────────────────────────── 10. Threat Intelligence ─────────────────
+    @pyqtSlot(bool)
+    def _on_threat_monitoring_toggled(self, start: bool) -> None:
+        """Enable or disable real-time destination reputation mapping."""
+        self.threat_intel_tab.set_monitoring(start)
+        if start:
+            self._threat_intel_thread = ThreatIntelThread()
+            self._register_thread(self._threat_intel_thread)
+            self._threat_intel_thread.intel_result.connect(self.threat_intel_tab.update_intel)
+            self._threat_intel_thread.error_signal.connect(self._on_engine_error)
+            self._threat_intel_thread.start()
+            self._add_log("INFO", "Real-time threat intelligence lookup profiling started.")
+        else:
+            if self._threat_intel_thread and self._threat_intel_thread.isRunning():
+                self._threat_intel_thread.stop()
+                self._threat_intel_thread.wait(2000)
+            self._add_log("INFO", "Threat intelligence destination profiling stopped.")
+
+    # ────────────────────────────── 11. Topology double-click ───────────────
+    @pyqtSlot(str)
+    def _on_topology_double_clicked(self, ip: str) -> None:
+        """Switch to Port Scanner tab and prefill the target IP."""
+        self._switch_tab(5)  # index 5 is Ports tab
+        if hasattr(self.ports_tab, "input_target"):
+            self.ports_tab.input_target.setText(ip)

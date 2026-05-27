@@ -26,6 +26,8 @@ from scapy.all import (  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
+from .os_fingerprint import OSFingerprinter
+
 
 class PacketCaptureThread(QThread):
     """
@@ -178,10 +180,17 @@ class PacketCaptureThread(QThread):
         protocol = "OTHER"
         info = ""
 
+        os_guess = "Unknown"
         if pkt.haslayer(IP):
             ip_layer = pkt[IP]
             src_ip = ip_layer.src
             dst_ip = ip_layer.dst
+            if pkt.haslayer(TCP):
+                tcp_layer = pkt[TCP]
+                ttl = getattr(ip_layer, "ttl", None)
+                win = getattr(tcp_layer, "window", None)
+                df = "DF" in str(getattr(ip_layer, "flags", ""))
+                os_guess = OSFingerprinter.fingerprint(ttl, win, df)
 
         # Determine protocol and build info summary
         if pkt.haslayer(DNS):
@@ -235,6 +244,7 @@ class PacketCaptureThread(QThread):
             "layers": layers,
             "raw_hex": raw_hex,
             "number": self._counter,
+            "os_guess": os_guess,
         }
 
         self.packet_captured.emit(summary)

@@ -16,6 +16,7 @@ from .port_scanner import PortScannerThread
 from .dhcp_watcher import DHCPWatcherThread
 from .ssl_inspector import SSLInspectorThread
 from .mitm_detector import MITMDetectorThread
+from .threat_intel import ThreatIntelThread
 
 __all__ = [
     "VendorLookup",
@@ -27,4 +28,5 @@ __all__ = [
     "DHCPWatcherThread",
     "SSLInspectorThread",
     "MITMDetectorThread",
+    "ThreatIntelThread",
 ]
